@@ -914,7 +914,7 @@ function getGPS(centerMap = false) {
         addLog('GPS error: ' + err.message);
         showToast('GPS error: ' + err.message, 'warning');
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+      { enableHighAccuracy: true, timeout: 25000, maximumAge: 10000 }
     );
   }
 
