@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#1e88e5" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SafeConnect" />
+  <title>SafeConnect — Emergency Location Sharing</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg-dark:    #0a1628;
+      --bg-card:    #0f1e35;
+      --bg-input:   #162340;
+      --blue:       #1e88e5;
+      --blue-light: #42a5f5;
+      --red:        #ef5350;
+      --green:      #66bb6a;
+      --orange:     #ffa726;
+      --yellow:     #ffca28;
+      --text:       #e8edf5;
+      --text-muted: #7a8fa8;
+      --border:     #1e3050;
+      --radius:     12px;
+      --shadow:     0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Screens ── */
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: flex; flex-direction: column; }
+
+    /* ── Login Screen ── */
+    #loginScreen {
+      background: linear-gradient(145deg, #0a1628 0%, #0d1f3c 50%, #0a2040 100%);
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #loginScreen::before {
+      content: '';
+      position: absolute;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(30,136,229,0.12) 0%, transparent 70%);
+      top: -100px; right: -100px;
+      border-radius: 50%;
+    }
+
+    #loginScreen::after {
+      content: '';
+      position: absolute;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(239,83,80,0.08) 0%, transparent 70%);
+      bottom: -80px; left: -80px;
+      border-radius: 50%;
+    }
+
+    .login-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px 32px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: var(--shadow);
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .logo-icon {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, var(--blue) 0%, #0d47a1 100%);
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+      margin: 0 auto 16px;
+      box-shadow: 0 8px 32px rgba(30,136,229,0.3);
+    }
+
+    .logo h1 { font-size: 26px; font-weight: 700; color: var(--text); }
+    .logo p  { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 15px;
+      padding: 12px 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus { border-color: var(--blue); }
+    .form-group select option { background: var(--bg-card); }
+
+    .phone-row { display: flex; gap: 8px; }
+    .country-code {
+      width: 80px;
+      flex-shrink: 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--blue) 0%, #1565c0 100%);
+      color: white;
+      box-shadow: 0 4px 16px rgba(30,136,229,0.3);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(30,136,229,0.4); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .otp-row { display: flex; gap: 8px; }
+    .otp-row input { flex: 1; letter-spacing: 8px; text-align: center; font-size: 20px; font-family: 'JetBrains Mono', monospace; }
+    .btn-resend {
+      width: auto;
+      padding: 12px 16px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 0;
+    }
+    .btn-resend:hover { border-color: var(--blue); color: var(--blue); }
+
+    .step { display: none; }
+    .step.active { display: block; }
+
+    .role-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .role-card {
+      background: var(--bg-input);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .role-card:hover { border-color: var(--blue); }
+    .role-card.selected { border-color: var(--blue); background: rgba(30,136,229,0.12); }
+    .role-card .role-icon { font-size: 28px; margin-bottom: 6px; }
+    .role-card .role-name { font-size: 13px; font-weight: 600; }
+    .role-card .role-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Main App ── */
+    #appScreen { background: var(--bg-dark); }
+
+    .topbar {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      z-index: 1000;
+    }
+
+    .topbar-left { display: flex; align-items: center; gap: 10px; }
+    .topbar-logo { font-size: 20px; font-weight: 700; color: var(--blue-light); }
+    .topbar-role {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .role-public   { background: rgba(102,187,106,0.15); color: var(--green); }
+    .role-police   { background: rgba(30,136,229,0.15);  color: var(--blue-light); }
+    .role-medical  { background: rgba(239,83,80,0.15);   color: var(--red); }
+    .role-official { background: rgba(255,167,38,0.15);  color: var(--orange); }
+
+    .topbar-right { display: flex; align-items: center; gap: 8px; }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: background 0.3s;
+    }
+    .status-dot.online  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .status-dot.offline { background: var(--red); }
+
+    .icon-btn {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-muted);
+      padding: 6px 10px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .icon-btn:hover { border-color: var(--blue); color: var(--blue-light); }
+
+    /* ── Map ── */
+    #map {
+      flex: 1;
+      min-height: 300px;
+      z-index: 1;
+    }
+
+    /* ── Bottom Panel ── */
+    .bottom-panel {
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      padding: 16px;
+      flex-shrink: 0;
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+
+    .location-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .info-box {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+    }
+    .info-box .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; }
+    .info-box .value { font-size: 14px; font-weight: 600; font-family: 'JetBrains Mono', monospace; margin-top: 2px; color: var(--blue-light); }
+
+    .action-row { display: flex; gap: 10px; margin-bottom: 14px; }
+
+    .btn-track {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: linear-gradient(135deg, var(--blue) 0%, #1565c0 100%);
+      color: white;
+    }
+    .btn-track.active {
+      background: linear-gradient(135deg, #37474f 0%, #263238 100%);
+    }
+
+    .btn-sos {
+      padding: 12px 20px;
+      border: none;
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--red) 0%, #b71c1c 100%);
+      color: white;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 16px rgba(239,83,80,0.3);
+      transition: all 0.2s;
+      animation: sosPulse 2s infinite;
+    }
+    .btn-sos:hover { transform: scale(1.04); }
+
+    @keyframes sosPulse {
+      0%, 100% { box-shadow: 0 4px 16px rgba(239,83,80,0.3); }
+      50% { box-shadow: 0 4px 24px rgba(239,83,80,0.6); }
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-input);
+      border-radius: var(--radius);
+      padding: 4px;
+      margin-bottom: 12px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 7px;
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      background: transparent;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+    .tab.active { background: var(--bg-card); color: var(--blue-light); }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Zone List ── */
+    .zone-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .zone-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 20px;
+      text-transform: uppercase;
+    }
+    .zone-safe       { background: rgba(102,187,106,0.15); color: var(--green); }
+    .zone-restricted { background: rgba(239,83,80,0.15);   color: var(--red); }
+    .zone-medical    { background: rgba(239,83,80,0.1);    color: #ff8a80; }
+    .zone-staging    { background: rgba(255,167,38,0.15);  color: var(--orange); }
+
+    /* ── POI List ── */
+    .poi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .poi-item {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 12px;
+    }
+    .poi-item:hover { border-color: var(--blue); }
+    .poi-item .poi-icon { font-size: 22px; margin-bottom: 4px; }
+    .poi-item .poi-count { font-size: 10px; color: var(--text-muted); }
+
+    /* ── Toast ── */
+    .toast-container {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+      width: 90%;
+      max-width: 380px;
+    }
+
+    .toast {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 13px;
+      box-shadow: var(--shadow);
+      animation: slideDown 0.3s ease;
+      pointer-events: all;
+    }
+    .toast.success { border-color: var(--green); }
+    .toast.error   { border-color: var(--red); }
+    .toast.warning { border-color: var(--orange); }
+    .toast.info    { border-color: var(--blue); }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Offline Banner ── */
+    .offline-banner {
+      background: rgba(239,83,80,0.15);
+      border-bottom: 1px solid var(--red);
+      color: var(--red);
+      text-align: center;
+      padding: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      display: none;
+    }
+    .offline-banner.show { display: block; }
+
+    /* ── Loading ── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Leaflet override */
+    .leaflet-container { background: #0d1b2e !important; }
+    .leaflet-popup-content-wrapper {
+      background: var(--bg-card) !important;
+      color: var(--text) !important;
+      border: 1px solid var(--border) !important;
+      box-shadow: var(--shadow) !important;
+    }
+    .leaflet-popup-tip { background: var(--bg-card) !important; }
+
+    @media (max-width: 360px) {
+      .login-card { padding: 28px 20px; }
+      .role-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Toast Container ── -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ══════════════════════════════════════════════════
+     LOGIN SCREEN
+══════════════════════════════════════════════════ -->
+<div class="screen active" id="loginScreen">
+  <div class="login-card">
+    <div class="logo">
+      <div class="logo-icon">🛡️</div>
+      <h1>SafeConnect</h1>
+      <p>Emergency Location Sharing</p>
+    </div>
+
+    <!-- Step 1: Phone -->
+    <div class="step active" id="step1">
+      <div class="form-group">
+        <label>Mobile Number</label>
+        <div class="phone-row">
+          <span style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--text-muted);flex-shrink:0;">+91</span>
+          <input type="tel" id="phoneInput" placeholder="Enter 10-digit number" maxlength="10" style="flex:1;" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Select Role</label>
+        <div class="role-grid">
+          <div class="role-card selected" data-role="public" onclick="selectRole(this)">
+            <div class="role-icon">👤</div>
+            <div class="role-name">Public</div>
+            <div class="role-desc">General user</div>
+          </div>
+          <div class="role-card" data-role="police" onclick="selectRole(this)">
+            <div class="role-icon">👮</div>
+            <div class="role-name">Police</div>
+            <div class="role-desc">Law enforcement</div>
+          </div>
+          <div class="role-card" data-role="medical" onclick="selectRole(this)">
+            <div class="role-icon">🏥</div>
+            <div class="role-name">Medical</div>
+            <div class="role-desc">Health team</div>
+          </div>
+          <div class="role-card" data-role="official" onclick="selectRole(this)">
+            <div class="role-icon">🎖️</div>
+            <div class="role-name">Official</div>
+            <div class="role-desc">Event manager</div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="sendOtpBtn" onclick="sendOTP()">
+        Send OTP
+      </button>
+    </div>
+
+    <!-- Step 2: OTP -->
+    <div class="step" id="step2">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;" id="otpHint">
+        OTP sent to your number
+      </p>
+      <div class="form-group">
+        <label>Enter OTP</label>
+        <div class="otp-row">
+          <input type="tel" id="otpInput" placeholder="••••••" maxlength="6" />
+          <button class="btn btn-resend" id="resendBtn" onclick="resendOTP()">Resend</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="verifyOtpBtn" onclick="verifyOTP()">
+        Verify & Enter
+      </button>
+      <button class="btn" style="background:transparent;color:var(--text-muted);font-size:13px;margin-top:4px;" onclick="goBack()">
+        ← Change number
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MAIN APP SCREEN
+══════════════════════════════════════════════════ -->
+<div class="screen" id="appScreen">
+
+  <!-- Offline Banner -->
+  <div class="offline-banner" id="offlineBanner">
+    📵 You are offline — SOS and location will sync when reconnected
+  </div>
+
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-logo">🛡️ SafeConnect</span>
+      <span class="topbar-role" id="roleLabel">Public</span>
+    </div>
+    <div class="topbar-right">
+      <div class="status-dot" id="statusDot"></div>
+      <button class="icon-btn" onclick="centerOnMe()" title="Center map">📍</button>
+      <button class="icon-btn" onclick="logout()" title="Logout">⏏</button>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+
+  <!-- Bottom Panel -->
+  <div class="bottom-panel">
+
+    <!-- Location Info -->
+    <div class="location-info">
+      <div class="info-box">
+        <div class="label">Latitude</div>
+        <div class="value" id="latVal">--</div>
+      </div>
+      <div class="info-box">
+        <div class="label">Longitude</div>
+        <div class="value" id="lngVal">--</div>
+      </div>
+      <div class="info-box">
+        <div class="label">Accuracy</div>
+        <div class="value" id="accVal">--</div>
+      </div>
+      <div class="info-box">
+        <div class="label">Zone Status</div>
+        <div class="value" id="zoneVal" style="font-size:12px;">Unknown</div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-row">
+      <button class="btn-track" id="trackBtn" onclick="toggleTracking()">▶ Start Tracking</button>
+      <button class="btn-sos" onclick="sendSOS()">🆘 SOS</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('zones', this)">Zones</button>
+      <button class="tab" onclick="switchTab('poi', this)">POI</button>
+      <button class="tab" onclick="switchTab('log', this)">Log</button>
+    </div>
+
+    <!-- Zones Tab -->
+    <div class="tab-content active" id="tab-zones">
+      <div id="zoneList"></div>
+    </div>
+
+    <!-- POI Tab -->
+    <div class="tab-content" id="tab-poi">
+      <div class="poi-grid" id="poiGrid"></div>
+    </div>
+
+    <!-- Log Tab -->
+    <div class="tab-content" id="tab-log">
+      <div id="logList" style="font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;max-height:140px;overflow-y:auto;"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Scripts ── -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════
+// SafeConnect PWA V1.5 — Core Logic
+// ═══════════════════════════════════════════════════════
+
+// ── Config ───────────────────────────────────────────
+const CONFIG = {
+  API_BASE: 'https://safeconnect-api-xxxxxx-uc.a.run.app',
+  DEMO_OTP: '123456',
+  TRACK_INTERVALS: { public: 30000, police: 10000, medical: 15000, official: 20000 },
+  GPS_SAMPLES: 3,
+  // Kumbh Mela demo center
+  MAP_CENTER: [25.4358, 81.8463],
+  MAP_ZOOM: 14
+};
+
+// ── State ────────────────────────────────────────────
+const state = {
+  phone: '', role: 'public', token: null,
+  lat: null, lng: null, accuracy: null,
+  tracking: false, trackTimer: null,
+  currentZone: null, isOnline: navigator.onLine,
+  map: null, userMarker: null,
+  zonesLayer: null, poisLayer: null,
+  pendingQueue: 0
+};
+
+// ── Demo Data ────────────────────────────────────────
+const DEMO_ZONES = [
+  { id: 'z1', name: 'Main Event Area',    lat: 25.4358, lng: 81.8463, radius: 800,  type: 'safe',       color: '#66bb6a' },
+  { id: 'z2', name: 'Sangam Ghat',        lat: 25.4210, lng: 81.8850, radius: 600,  type: 'safe',       color: '#42a5f5' },
+  { id: 'z3', name: 'Medical Zone A',     lat: 25.4380, lng: 81.8400, radius: 200,  type: 'medical',    color: '#ef5350' },
+  { id: 'z4', name: 'VIP Restricted',     lat: 25.4450, lng: 81.8550, radius: 300,  type: 'restricted', color: '#ef5350' },
+  { id: 'z5', name: 'Parking Zone P1',    lat: 25.4250, lng: 81.8300, radius: 400,  type: 'staging',    color: '#ffa726' },
+  { id: 'z6', name: 'Emergency Corridor', lat: 25.4320, lng: 81.8600, radius: 150,  type: 'restricted', color: '#ff5252' }
+];
+
+const DEMO_POIS = [
+  { icon: '🏥', name: 'Medical',   count: 8,  lat: 25.4380, lng: 81.8400 },
+  { icon: '🚿', name: 'Washroom',  count: 24, lat: 25.4340, lng: 81.8450 },
+  { icon: '🛕', name: 'Ghat',      count: 6,  lat: 25.4210, lng: 81.8850 },
+  { icon: '🍱', name: 'Food',      count: 15, lat: 25.4370, lng: 81.8480 },
+  { icon: '👮', name: 'Police',    count: 12, lat: 25.4360, lng: 81.8470 },
+  { icon: '🚪', name: 'Exit',      count: 9,  lat: 25.4290, lng: 81.8500 },
+  { icon: '🅿️', name: 'Parking',   count: 4,  lat: 25.4250, lng: 81.8300 },
+  { icon: '🆘', name: 'First Aid', count: 6,  lat: 25.4395, lng: 81.8415 },
+  { icon: '💧', name: 'Water',     count: 32, lat: 25.4350, lng: 81.8455 }
+];
+
+// ── Service Worker ───────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => addLog('SW registered: ' + reg.scope))
+      .catch(err => addLog('SW error: ' + err.message));
+  });
+}
+
+// ── Online/Offline ───────────────────────────────────
+window.addEventListener('online',  () => setOnline(true));
+window.addEventListener('offline', () => setOnline(false));
+
+function setOnline(online) {
+  state.isOnline = online;
+  const dot    = document.getElementById('statusDot');
+  const banner = document.getElementById('offlineBanner');
+  dot.className = 'status-dot ' + (online ? 'online' : 'offline');
+  banner.classList.toggle('show', !online);
+  if (online) {
+    addLog('Back online — syncing queue...');
+    triggerBackgroundSync();
+  }
+}
+
+function triggerBackgroundSync() {
+  if ('serviceWorker' in navigator && 'SyncManager' in window) {
+    navigator.serviceWorker.ready.then(reg => {
+      reg.sync.register('sync-locations');
+      reg.sync.register('sync-sos');
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// LOGIN FLOW
+// ═══════════════════════════════════════════════════
+let selectedRole = 'public';
+
+function selectRole(el) {
+  document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedRole = el.dataset.role;
+}
+
+async function sendOTP() {
+  const phone = document.getElementById('phoneInput').value.trim();
+  if (phone.length !== 10 || !/^\d+$/.test(phone)) {
+    showToast('Enter a valid 10-digit mobile number', 'error');
+    return;
+  }
+  state.phone = phone;
+  state.role  = selectedRole;
+
+  const btn = document.getElementById('sendOtpBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Sending...';
+
+  // In production: call MSG91 OTP API
+  await sleep(1200);
+
+  document.getElementById('otpHint').textContent = `OTP sent to +91 ${phone}`;
+  showStep('step2');
+  showToast('OTP sent! (Demo OTP: 123456)', 'success');
+  btn.disabled = false;
+  btn.innerHTML = 'Send OTP';
+}
+
+async function verifyOTP() {
+  const otp = document.getElementById('otpInput').value.trim();
+  if (otp.length !== 6) { showToast('Enter 6-digit OTP', 'error'); return; }
+
+  const btn = document.getElementById('verifyOtpBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Verifying...';
+
+  await sleep(1000);
+
+  if (otp === CONFIG.DEMO_OTP) {
+    state.token = 'demo-token-' + Date.now();
+    showToast('Verified! Welcome to SafeConnect 🛡️', 'success');
+    await sleep(600);
+    launchApp();
+  } else {
+    showToast('Invalid OTP. Try 123456 for demo.', 'error');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Verify & Enter';
+}
+
+function resendOTP() {
+  showToast('OTP resent (Demo: 123456)', 'info');
+}
+
+function goBack() {
+  showStep('step1');
+}
+
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function logout() {
+  state.tracking = false;
+  clearInterval(state.trackTimer);
+  document.getElementById('appScreen').classList.remove('active');
+  document.getElementById('loginScreen').classList.add('active');
+  document.getElementById('otpInput').value = '';
+  document.getElementById('phoneInput').value = '';
+  showStep('step1');
+}
+
+// ═══════════════════════════════════════════════════
+// APP INIT
+// ═══════════════════════════════════════════════════
+function launchApp() {
+  document.getElementById('loginScreen').classList.remove('active');
+  document.getElementById('appScreen').classList.add('active');
+
+  const roleLabel = document.getElementById('roleLabel');
+  roleLabel.textContent = state.role.charAt(0).toUpperCase() + state.role.slice(1);
+  roleLabel.className = 'topbar-role role-' + state.role;
+
+  setOnline(navigator.onLine);
+  initMap();
+  renderZones();
+  renderPOI();
+  addLog(`Logged in as ${state.role} — ${state.phone}`);
+}
+
+// ═══════════════════════════════════════════════════
+// MAP
+// ═══════════════════════════════════════════════════
+function initMap() {
+  if (state.map) return;
+
+  state.map = L.map('map', {
+    center: CONFIG.MAP_CENTER,
+    zoom:   CONFIG.MAP_ZOOM,
+    zoomControl: true
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(state.map);
+
+  // Draw demo geo-zones
+  DEMO_ZONES.forEach(zone => {
+    L.circle([zone.lat, zone.lng], {
+      radius: zone.radius,
+      color:       zone.color,
+      fillColor:   zone.color,
+      fillOpacity: 0.08,
+      weight: 2,
+      dashArray: zone.type === 'restricted' ? '6,4' : null
+    }).addTo(state.map)
+      .bindPopup(`<b>${zone.name}</b><br><small>${zone.type.toUpperCase()}</small>`);
+  });
+
+  // Draw demo POIs
+  DEMO_POIS.forEach(poi => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="font-size:20px;line-height:1;">${poi.icon}</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
+    });
+    L.marker([poi.lat, poi.lng], { icon })
+      .addTo(state.map)
+      .bindPopup(`<b>${poi.icon} ${poi.name}</b><br><small>${poi.count} locations</small>`);
+  });
+
+  addLog('Map initialised — Kumbh Mela demo preset');
+}
+
+function centerOnMe() {
+  if (state.lat && state.map) {
+    state.map.setView([state.lat, state.lng], 16);
+  } else {
+    getGPS(true);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// GPS
+// ═══════════════════════════════════════════════════
+function getGPS(centerMap = false) {
+  if (!navigator.geolocation) {
+    showToast('Geolocation not supported', 'error');
+    return;
+  }
+
+  let samples = [], attempts = 0;
+
+  function takeSample() {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        samples.push({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          acc: pos.coords.accuracy
+        });
+        attempts++;
+        if (attempts < CONFIG.GPS_SAMPLES) {
+          setTimeout(takeSample, 800);
+        } else {
+          // Average samples
+          const avg = samples.reduce((a, b) => ({
+            lat: a.lat + b.lat / samples.length,
+            lng: a.lng + b.lng / samples.length,
+            acc: a.acc + b.acc / samples.length
+          }), { lat: 0, lng: 0, acc: 0 });
+
+          // Correct averaging
+          state.lat = samples.reduce((s, p) => s + p.lat, 0) / samples.length;
+          state.lng = samples.reduce((s, p) => s + p.lng, 0) / samples.length;
+          state.accuracy = Math.round(samples.reduce((s, p) => s + p.acc, 0) / samples.length);
+
+          updateLocationUI();
+          updateUserMarker(centerMap);
+          checkGeoFence();
+          sendLocationToAPI();
+        }
+      },
+      err => {
+        addLog('GPS error: ' + err.message);
+        showToast('GPS error: ' + err.message, 'warning');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+    );
+  }
+
+  takeSample();
+}
+
+function updateLocationUI() {
+  document.getElementById('latVal').textContent = state.lat.toFixed(5);
+  document.getElementById('lngVal').textContent = state.lng.toFixed(5);
+  document.getElementById('accVal').textContent = state.accuracy + 'm';
+}
+
+function updateUserMarker(center = false) {
+  if (!state.map) return;
+
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="
+      width:16px;height:16px;
+      background:${state.role === 'public' ? '#1e88e5' : state.role === 'police' ? '#42a5f5' : state.role === 'medical' ? '#ef5350' : '#ffa726'};
+      border:3px solid white;
+      border-radius:50%;
+      box-shadow:0 0 10px rgba(30,136,229,0.6);
+    "></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+  });
+
+  if (state.userMarker) {
+    state.userMarker.setLatLng([state.lat, state.lng]).setIcon(icon);
+  } else {
+    state.userMarker = L.marker([state.lat, state.lng], { icon })
+      .addTo(state.map)
+      .bindPopup('📍 You are here');
+  }
+
+  if (center) state.map.setView([state.lat, state.lng], 16);
+}
+
+// ═══════════════════════════════════════════════════
+// GEO-FENCING
+// ═══════════════════════════════════════════════════
+function checkGeoFence() {
+  if (!state.lat) return;
+
+  let inside = null;
+  for (const zone of DEMO_ZONES) {
+    const dist = haversine(state.lat, state.lng, zone.lat, zone.lng);
+    if (dist <= zone.radius) {
+      inside = zone;
+      break;
+    }
+  }
+
+  const zoneEl = document.getElementById('zoneVal');
+
+  if (inside) {
+    if (state.currentZone?.id !== inside.id) {
+      state.currentZone = inside;
+      zoneEl.textContent = inside.name.substring(0, 12) + '…';
+      zoneEl.style.color = inside.color;
+
+      if (inside.type === 'restricted') {
+        showToast(`⚠️ You entered restricted zone: ${inside.name}`, 'warning');
+        publishEvent('zone-breach', { zoneId: inside.id, zoneName: inside.name });
+      } else {
+        addLog(`Entered zone: ${inside.name}`);
+      }
+    }
+  } else {
+    if (state.currentZone) {
+      addLog(`Left zone: ${state.currentZone.name}`);
+      state.currentZone = null;
+    }
+    zoneEl.textContent = 'Open Area';
+    zoneEl.style.color = 'var(--text-muted)';
+  }
+}
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ═══════════════════════════════════════════════════
+// TRACKING
+// ═══════════════════════════════════════════════════
+function toggleTracking() {
+  const btn = document.getElementById('trackBtn');
+  if (!state.tracking) {
+    state.tracking = true;
+    btn.textContent = '⏹ Stop Tracking';
+    btn.classList.add('active');
+    const interval = CONFIG.TRACK_INTERVALS[state.role];
+    getGPS(true);
+    state.trackTimer = setInterval(() => getGPS(false), interval);
+    addLog(`Tracking started (${interval/1000}s interval)`);
+    showToast('Location tracking started', 'success');
+  } else {
+    state.tracking = false;
+    clearInterval(state.trackTimer);
+    btn.textContent = '▶ Start Tracking';
+    btn.classList.remove('active');
+    addLog('Tracking stopped');
+    showToast('Tracking stopped', 'info');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// SOS
+// ═══════════════════════════════════════════════════
+async function sendSOS() {
+  const confirmed = confirm('🆘 Send SOS Alert?\nThis will alert emergency services and share your location.');
+  if (!confirmed) return;
+
+  const payload = {
+    phone: state.phone,
+    role:  state.role,
+    lat:   state.lat,
+    lng:   state.lng,
+    accuracy: state.accuracy,
+    zone: state.currentZone?.name || 'Unknown',
+    timestamp: new Date().toISOString()
+  };
+
+  addLog('SOS triggered!');
+  showToast('🆘 SOS Alert Sent! Help is on the way.', 'error');
+
+  await publishEvent('sos-alerts', payload);
+
+  // SMS fallback
+  if (!state.isOnline) {
+    const smsText = `SAFECONNECT SOS: ${state.phone} at ${state.lat},${state.lng} Zone:${payload.zone}`;
+    addLog('SMS fallback: ' + smsText);
+    showToast('📵 Offline — SMS fallback queued', 'warning');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// API CALLS (Pub/Sub stubs)
+// ═══════════════════════════════════════════════════
+async function sendLocationToAPI() {
+  const payload = {
+    phone: state.phone,
+    role:  state.role,
+    lat:   state.lat,
+    lng:   state.lng,
+    accuracy: state.accuracy,
+    zone: state.currentZone?.id || null,
+    timestamp: new Date().toISOString()
+  };
+
+  await publishEvent('location-pings', payload);
+}
+
+async function publishEvent(topic, payload) {
+  const endpoint = `${CONFIG.API_BASE}/api/v1/events/${topic}`;
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.token}`
+      },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) addLog(`✓ Published to ${topic}`);
+  } catch (err) {
+    addLog(`✗ Offline — queued for ${topic}`);
+    // SW will sync via IndexedDB when back online
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════
+function renderZones() {
+  const list = document.getElementById('zoneList');
+  list.innerHTML = DEMO_ZONES.map(z => `
+    <div class="zone-item">
+      <span>${z.name}</span>
+      <span class="zone-badge zone-${z.type}">${z.type}</span>
+    </div>
+  `).join('');
+}
+
+function renderPOI() {
+  const grid = document.getElementById('poiGrid');
+  grid.innerHTML = DEMO_POIS.map(p => `
+    <div class="poi-item" onclick="focusPOI(${p.lat}, ${p.lng})">
+      <div class="poi-icon">${p.icon}</div>
+      <div>${p.name}</div>
+      <div class="poi-count">${p.count} sites</div>
+    </div>
+  `).join('');
+}
+
+function focusPOI(lat, lng) {
+  if (state.map) state.map.setView([lat, lng], 16);
+}
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+function addLog(msg) {
+  const log = document.getElementById('logList');
+  if (!log) return;
+  const time = new Date().toLocaleTimeString();
+  log.innerHTML = `<div>[${time}] ${msg}</div>` + log.innerHTML;
+}
+
+function showToast(msg, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = msg;
+  container.prepend(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Init ─────────────────────────────────────────────
+setOnline(navigator.onLine);
+</script>
+</body>
+</html>
