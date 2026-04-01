@@ -2546,8 +2546,11 @@ async function sendOTP() {
     showToast('OTP sent! (Local dev: use 123456)', 'success');
 
   } catch (err) {
-    addLog('sendOTP failed: ' + err.message);
-    showToast('Could not send OTP: ' + err.message, 'error');
+    // Backend unreachable — fall back to demo mode automatically
+    addLog('Backend unreachable — falling back to demo mode: ' + err.message);
+    document.getElementById('otpHint').textContent = `Backend offline · Demo OTP: 123456`;
+    showStep('step2');
+    showToast('Backend offline — Demo mode: use OTP 123456', 'info');
   } finally {
     btn.disabled = false;
     btn.innerHTML = 'Send OTP';
@@ -2672,8 +2675,30 @@ async function verifyOTP() {
     }
 
   } catch (err) {
-    addLog('verifyOTP failed: ' + err.message);
-    showToast(err.message || 'Verification failed. Try again.', 'error');
+    // Backend unreachable — fall back to demo mode if OTP is 123456
+    if (otp === CONFIG.DEMO_OTP) {
+      addLog('Backend unreachable — demo fallback accepted OTP 123456');
+      const payload = btoa(JSON.stringify({
+        sub: btoa(state.phone), role: state.role,
+        shard: 'ep1', jti: 'demo-' + Date.now(),
+        exp: Math.floor(Date.now()/1000) + 43200
+      }));
+      state.token = `demo.${payload}.demo`;
+      showToast('Backend offline — Demo mode active 🛡️', 'info');
+      btn.innerHTML = '<span class="spinner"></span> Getting location...';
+      await captureLocationOnLogin();
+      const profile = loadProfileFromStorage();
+      if (profile && profile.phone === state.phone) {
+        state.userProfile = profile;
+        launchApp();
+      } else {
+        document.getElementById('profilePhone').value = state.phone;
+        showStep('step3');
+      }
+    } else {
+      addLog('verifyOTP failed: ' + err.message);
+      showToast('Verification failed — backend offline. Use OTP 123456 to test.', 'error');
+    }
   } finally {
     btn.disabled = false;
     btn.innerHTML = 'Verify & Enter';
