@@ -1,0 +1,59 @@
+# ══════════════════════════════════════════════════════
+# SafeConnect — Netlify Configuration
+# Security headers applied to all responses
+# ══════════════════════════════════════════════════════
+
+[build]
+  publish = "."
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+
+    # ── Content Security Policy ──────────────────────────────────────
+    # Controls what resources the browser is allowed to load.
+    # Blocks XSS — even if a malicious script is injected, it can't
+    # read localStorage or make API calls to unauthorised origins.
+    Content-Security-Policy = """
+      default-src 'self';
+      script-src  'self' 'unsafe-inline' unpkg.com fonts.googleapis.com;
+      style-src   'self' 'unsafe-inline' fonts.googleapis.com;
+      font-src    fonts.gstatic.com;
+      connect-src 'self'
+                  https://*.run.app
+                  https://*.tile.openstreetmap.org
+                  https://tile.openstreetmap.org;
+      img-src     'self' data: https://*.tile.openstreetmap.org;
+      worker-src  'self';
+      manifest-src 'self';
+    """
+
+    # ── Clickjacking Protection ───────────────────────────────────────
+    # Prevents your app from being embedded in an iframe on another site.
+    # Attacker trick: overlay invisible iframe → user taps SOS on fake site
+    # thinking they're using SafeConnect.
+    X-Frame-Options = "DENY"
+
+    # ── MIME Sniffing Protection ──────────────────────────────────────
+    # Stops browser from guessing content types.
+    # Prevents: attacker uploads a JS file disguised as an image.
+    X-Content-Type-Options = "nosniff"
+
+    # ── Referrer Leakage Protection ───────────────────────────────────
+    # Stops your Cloud Run API URL from leaking in the Referer header
+    # when users navigate away from SafeConnect.
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+    # ── Permissions Policy ────────────────────────────────────────────
+    # Explicitly restricts which browser features are allowed.
+    # Only SafeConnect itself can request geolocation — no embedded iframes.
+    Permissions-Policy = "geolocation=(self), camera=(), microphone=(), payment=()"
+
+    # ── HSTS — Force HTTPS ────────────────────────────────────────────
+    # Once a user visits SafeConnect over HTTPS, their browser will ONLY
+    # ever contact it over HTTPS for the next year — even if they type http://.
+    # Critical at large events where fake HTTP hotspots are common.
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+
+    # ── XSS Protection (legacy browsers) ─────────────────────────────
+    X-XSS-Protection = "1; mode=block"
