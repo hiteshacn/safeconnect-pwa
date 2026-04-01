@@ -1998,6 +1998,7 @@ const CONFIG = {
   // PRODUCTION: change back to your Cloud Run URL before deploying
   API_BASE: 'http://localhost:8080',
   DEMO_OTP: '123456',
+  DEMO_MODE: true,   // ← set false when backend is deployed to Cloud Run
   HEARTBEAT_INTERVALS: { public: 900000, police: 120000, medical: 300000, official: 600000 },
   MOVEMENT_THRESHOLD: 50,
   GPS_SAMPLES: 3,
@@ -2488,6 +2489,17 @@ async function sendOTP() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Sending...';
 
+  // ── DEMO MODE — skip backend, go straight to OTP step ──
+  if (CONFIG.DEMO_MODE) {
+    await sleep(600); // small delay so it feels real
+    document.getElementById('otpHint').textContent = `OTP sent to +91 ${phone} · Demo OTP: 123456`;
+    showStep('step2');
+    showToast('Demo mode — use OTP: 123456', 'success');
+    btn.disabled = false;
+    btn.innerHTML = 'Send OTP';
+    return;
+  }
+
   try {
     const res = await fetch(`${CONFIG.API_BASE}/auth/send-otp`, {
       method: 'POST',
@@ -2521,6 +2533,47 @@ async function verifyOTP() {
   const btn = document.getElementById('verifyOtpBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Verifying...';
+
+  // ── DEMO MODE — accept 123456, skip backend, fake JWT ──
+  if (CONFIG.DEMO_MODE) {
+    if (otp !== CONFIG.DEMO_OTP) {
+      showToast('Demo OTP is 123456', 'error');
+      btn.disabled = false;
+      btn.innerHTML = 'Verify & Enter';
+      return;
+    }
+    await sleep(800);
+
+    // Build a fake JWT payload so app functions normally
+    // Format: header.payload.signature (signature is fake — no backend validation in demo)
+    const payload = btoa(JSON.stringify({
+      sub:   btoa(state.phone),        // phone hash (fake)
+      role:  state.role,
+      shard: 'ep1',
+      jti:   'demo-' + Date.now(),
+      exp:   Math.floor(Date.now()/1000) + 43200  // 12 hours
+    }));
+    state.token = `demo.${payload}.demo`;
+    // Role stays as UI selection in demo mode
+    showToast('Welcome to SafeConnect 🛡️ (Demo Mode)', 'success');
+
+    btn.innerHTML = '<span class="spinner"></span> Getting location...';
+    await captureLocationOnLogin();
+
+    // Check for saved profile
+    const profile = loadProfileFromStorage();
+    if (profile && profile.phone === state.phone) {
+      state.userProfile = profile;
+      launchApp();
+    } else {
+      // New user — show profile setup
+      document.getElementById('profilePhone').value = state.phone;
+      showStep('step3');
+    }
+    btn.disabled = false;
+    btn.innerHTML = 'Verify & Enter';
+    return;
+  }
 
   try {
     // ── Call real backend /auth/verify-otp ──────────────────
