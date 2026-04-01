@@ -1590,6 +1590,35 @@
       <button class="btn-sos" onclick="sendSOS()">🆘 SOS</button>
     </div>
 
+    <!-- Tracking status + description — visible to all roles -->
+    <div id="trackingStatusBar" style="
+      display:none;
+      background:rgba(30,136,229,0.12);
+      border:1px solid rgba(30,136,229,0.3);
+      border-radius:8px;
+      padding:8px 12px;
+      margin-bottom:10px;
+      font-size:11px;
+      color:var(--blue-light);
+      line-height:1.6;
+    ">
+      <div style="font-weight:700;margin-bottom:2px;">📡 Tracking Active</div>
+      <div id="trackingStatusDetail" style="color:var(--text-muted);">Watching for movement...</div>
+    </div>
+
+    <!-- What is Start Tracking — shown when NOT tracking -->
+    <div id="trackingHelpText" style="
+      font-size:11px;
+      color:var(--text-muted);
+      line-height:1.6;
+      margin-bottom:10px;
+      padding:0 2px;
+    ">
+      <strong style="color:var(--text);">▶ Start Tracking</strong> shares your live GPS location.
+      Your position updates automatically when you move or on a timed heartbeat.
+      Used for family tracking, zone monitoring, and emergency response.
+    </div>
+
     <!-- Role welcome banner (shown briefly after login) -->
     <div class="role-welcome-banner" id="roleWelcomeBanner"></div>
 
@@ -1597,7 +1626,7 @@
     <div class="tabs" id="mainTabBar">
       <button class="tab active" data-tab="zones"    onclick="switchTab('zones',this)">Zones</button>
       <button class="tab"        data-tab="poi"      onclick="switchTab('poi',this)">Interest</button>
-      <button class="tab"        data-tab="park"     onclick="switchTab('park',this)">🅿️ Park</button>
+      <button class="tab"        data-tab="park"     onclick="switchTab('park',this)">🚗 Vehicle</button>
       <button class="tab"        data-tab="family"   onclick="switchTab('family',this)">👨‍👩‍👧 Family</button>
       <button class="tab"        data-tab="sos-list" onclick="switchTab('sos-list',this)">🆘 Alerts</button>
       <button class="tab"        data-tab="notices"  onclick="switchTab('notices',this)">📢 Notices</button>
@@ -3325,6 +3354,7 @@ function renderFamilyList() {
     const canMap   = m.lat !== null && m.lng !== null;
     const initials = m.nick.charAt(0).toUpperCase();
     const isReg    = m.registered === true;
+    const sc       = statusClass(m.status);  // ← was missing, caused render crash
 
     // Feature 1: Last fetched location row
     const locRow = m.fetchedLocation ? `
@@ -4144,6 +4174,9 @@ function initMap() {
 
   state.map = L.map('map', { center: CONFIG.MAP_CENTER, zoom: CONFIG.MAP_ZOOM, zoomControl: true });
 
+  // Leaflet needs invalidateSize after map div transitions from display:none to visible
+  setTimeout(() => { state.map.invalidateSize(); }, 300);
+
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors', maxZoom: 19
   }).addTo(state.map);
@@ -4277,18 +4310,35 @@ function detectParkingZone(lat, lng) {
 // TRACKING
 // ═══════════════════════════════════════════════════
 function toggleTracking() {
-  const btn = document.getElementById('trackBtn');
+  const btn        = document.getElementById('trackBtn');
+  const statusBar  = document.getElementById('trackingStatusBar');
+  const helpText   = document.getElementById('trackingHelpText');
+  const roleLabel  = { public:'15 min', police:'2 min', medical:'5 min', official:'10 min' };
+
   if (!state.tracking) {
     state.tracking = true;
     btn.textContent = '⏹ Stop Tracking';
     btn.classList.add('active');
     startHybridTracking();
     showToast('Location tracking started', 'success');
+
+    // Show status bar, hide help text
+    if (statusBar) statusBar.style.display = 'block';
+    if (helpText)  helpText.style.display  = 'none';
+    if (statusBar) {
+      const detail = document.getElementById('trackingStatusDetail');
+      if (detail) detail.textContent =
+        `Movement ping every ${CONFIG.MOVEMENT_THRESHOLD}m · Heartbeat every ${roleLabel[state.role]}`;
+    }
   } else {
     stopHybridTracking();
     btn.textContent = '▶ Start Tracking';
     btn.classList.remove('active');
     showToast('Tracking stopped', 'info');
+
+    // Hide status bar, show help text
+    if (statusBar) statusBar.style.display = 'none';
+    if (helpText)  helpText.style.display  = 'block';
   }
 }
 
